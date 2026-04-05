@@ -14,9 +14,9 @@ Web app that converts GraphQL introspection responses into friendly requests.
 - Export raw HTTP GET request
 
 ## Run locally
-npm install
+npm install &&
 npm run dev
 
 ## Docker
-sudo docker compose build
+sudo docker compose build && 
 sudo docker compose up
