@@ -15,6 +15,58 @@ function formatArgValue(value: unknown): string {
   return JSON.stringify(value, null, 0);
 }
 
+function formatGraphqlValue(
+  schema: NormalizedSchema,
+  type: FieldDef["type"],
+  value: unknown
+): string {
+  if (type.kind === "NON_NULL") {
+    return formatGraphqlValue(schema, type.ofType, value);
+  }
+
+  if (value === null || value === undefined) {
+    return "null";
+  }
+
+  if (type.kind === "LIST") {
+    if (!Array.isArray(value)) {
+      return `[${formatGraphqlValue(schema, type.ofType, value)}]`;
+    }
+    return `[${value.map((item) => formatGraphqlValue(schema, type.ofType, item)).join(", ")}]`;
+  }
+
+  const named = schema.types[type.name];
+  if (!named) {
+    return formatArgValue(value);
+  }
+
+  if (named.kind === "ENUM") {
+    if (typeof value === "string" && named.values.includes(value)) {
+      return value;
+    }
+    return named.values[0] ?? "VALUE";
+  }
+
+  if (named.kind === "INPUT_OBJECT") {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return "{}";
+    }
+
+    const objectValue = value as Record<string, unknown>;
+    const fields = named.inputFields.map((field) => {
+      const fieldValue =
+        field.name in objectValue
+          ? objectValue[field.name]
+          : exampleValueForType(schema, field.type);
+      return `${field.name}: ${formatGraphqlValue(schema, field.type, fieldValue)}`;
+    });
+
+    return `{ ${fields.join(", ")} }`;
+  }
+
+  return formatArgValue(value);
+}
+
 function buildArgs(schema: NormalizedSchema, field: FieldDef): string {
   if (!field.args.length) {
     return "";
@@ -22,7 +74,7 @@ function buildArgs(schema: NormalizedSchema, field: FieldDef): string {
 
   const pairs = field.args.map((arg) => {
     const value = exampleValueForType(schema, arg.type);
-    return `${arg.name}: ${formatArgValue(value)}`;
+    return `${arg.name}: ${formatGraphqlValue(schema, arg.type, value)}`;
   });
 
   return `(${pairs.join(", ")})`;
