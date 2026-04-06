@@ -14,8 +14,7 @@ Web app that converts GraphQL introspection responses into friendly requests.
 - Export raw HTTP GET request
 
 ## Run locally
-`npm install &&
-npm run start`
+`npm install && npm run build && npm run start`
 
 `npm run build` now auto-runs dependency install (`npm ci`) if `node_modules` is missing.
 
