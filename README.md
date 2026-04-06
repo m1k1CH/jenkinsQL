@@ -24,5 +24,5 @@ Web app that converts GraphQL introspection responses into friendly requests.
 ## Screenshots
 <img width="1266" height="914" alt="image" src="https://github.com/user-attachments/assets/856c87d7-1cd1-4fdc-a90b-c8afd2be9cb8" />
 <img width="1275" height="749" alt="image" src="https://github.com/user-attachments/assets/86bb5b49-67ad-465c-acfb-d2ef0a210c88" />
-<img width="1253" height="328" alt="image" src="https://github.com/user-attachments/assets/0ed1469b-5b0d-4bb7-83cd-206ff64a174f" />
-<img width="1252" height="868" alt="image" src="https://github.com/user-attachments/assets/cde5e7e4-8fd4-45c0-b2a0-c4d8725b774d" />
+<img width="1134" height="759" alt="image" src="https://github.com/user-attachments/assets/80a4837e-b47a-4b6a-865e-fd4ec582d141" />
+<img width="832" height="339" alt="image" src="https://github.com/user-attachments/assets/c2860b03-486c-4bbe-985c-49ca6197ef38" />
