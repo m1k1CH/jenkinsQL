@@ -18,8 +18,7 @@ Web app that converts GraphQL introspection responses into friendly requests.
 npm run start`
 
 ## Docker
-`sudo docker compose build && 
-sudo docker compose up`
+`sudo docker compose build && sudo docker compose up`
 
 ## Screenshots
 <img width="1250" height="900" alt="image" src="https://github.com/user-attachments/assets/fdef9813-015d-44de-861c-21be79111339" />
