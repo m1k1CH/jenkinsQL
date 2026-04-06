@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import CopyButton from "@/components/copy-button";
 
 type SchemaDiagramProps = {
   schemaSdl: string;
@@ -9,7 +8,6 @@ type SchemaDiagramProps = {
 
 export default function SchemaDiagram({ schemaSdl }: SchemaDiagramProps) {
   const [svg, setSvg] = useState("");
-  const [sdl, setSdl] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -20,7 +18,6 @@ export default function SchemaDiagram({ schemaSdl }: SchemaDiagramProps) {
     async function generate() {
       if (!schemaSdl.trim()) {
         setSvg("");
-        setSdl("");
         setError("");
         setElapsedMs(null);
         return;
@@ -58,7 +55,6 @@ export default function SchemaDiagram({ schemaSdl }: SchemaDiagramProps) {
         if (cancelled) return;
 
         setSvg(data.svg || "");
-        setSdl(data.sdl || "");
         setElapsedMs(typeof data.elapsedMs === "number" ? data.elapsedMs : null);
       } catch (err) {
         if (cancelled) return;
@@ -108,18 +104,15 @@ export default function SchemaDiagram({ schemaSdl }: SchemaDiagramProps) {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {sdl ? <CopyButton value={sdl} label="Copy SDL" /> : null}
-          {svgBlobUrl ? (
-            <a
-              href={svgBlobUrl}
-              download="schema-diagram.svg"
-              className="rounded-xl border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-800"
-            >
-              Download SVG
-            </a>
-          ) : null}
-        </div>
+        {svgBlobUrl ? (
+          <a
+            href={svgBlobUrl}
+            download="schema-diagram.svg"
+            className="rounded-xl border border-zinc-700 px-4 py-2 text-sm hover:bg-zinc-800"
+          >
+            Download SVG
+          </a>
+        ) : null}
       </div>
 
       {loading ? (

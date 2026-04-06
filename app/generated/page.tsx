@@ -89,22 +89,6 @@ export default function GeneratedPage() {
 
       {parsed && parsed.ok ? (
         <>
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold">Schema SDL</h3>
-                <p className="text-sm text-zinc-400">
-                  Parsed schema used by backend diagram generation.
-                </p>
-              </div>
-              <CopyButton value={parsed.sdl} label="Copy SDL" />
-            </div>
-
-            <pre className="mt-4 max-h-[500px] overflow-auto rounded-2xl bg-black p-4 text-sm">
-{parsed.sdl}
-            </pre>
-          </div>
-
           <div className="space-y-6">
             {operations.map((operation) => {
               const json = toJsonBody(operation.graphql);
