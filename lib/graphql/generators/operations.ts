@@ -6,185 +6,48 @@ export type GeneratedOperation = {
   name: string;
   kind: "query" | "mutation" | "subscription";
   graphql: string;
+  variables: Record<string, unknown>;
 };
 
-function formatArgValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "null";
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => formatArgValue(item)).join(", ")}]`;
-  }
-
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).map(
-      ([key, nested]) => `${key}: ${formatArgValue(nested)}`
-    );
-    return `{ ${entries.join(", ")} }`;
-  }
-
-  if (typeof value === "string") {
-    return JSON.stringify(value);
-  }
-  return String(value);
-}
-
-function formatGraphqlValue(
-  schema: NormalizedSchema,
-  type: FieldDef["type"],
-  value: unknown
-): string {
+function toGraphqlType(type: FieldDef["type"]): string {
   if (type.kind === "NON_NULL") {
-    return formatGraphqlValue(schema, type.ofType, value);
-  }
-
-  if (value === null || value === undefined) {
-    return "null";
+    return `${toGraphqlType(type.ofType)}!`;
   }
 
   if (type.kind === "LIST") {
-    if (typeof value === "string") {
-      try {
-        const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) {
-          return `[${parsed.map((item) => formatGraphqlValue(schema, type.ofType, item)).join(", ")}]`;
-        }
-      } catch {
-        // Keep fallback behavior for non-JSON strings.
-      }
-    }
-
-    if (!Array.isArray(value)) {
-      return `[${formatGraphqlValue(schema, type.ofType, value)}]`;
-    }
-    return `[${value.map((item) => formatGraphqlValue(schema, type.ofType, item)).join(", ")}]`;
+    return `[${toGraphqlType(type.ofType)}]`;
   }
 
-  const named = schema.types[type.name];
-  if (!named) {
-    return formatArgValue(value);
-  }
-
-  if (named.kind === "ENUM") {
-    if (typeof value === "string" && named.values.includes(value)) {
-      return value;
-    }
-    return named.values[0] ?? "VALUE";
-  }
-
-  if (named.kind === "INPUT_OBJECT") {
-    let preparedValue = value;
-    if (typeof preparedValue === "string") {
-      try {
-        preparedValue = JSON.parse(preparedValue);
-      } catch {
-        // Keep fallback behavior for non-JSON strings.
-      }
-    }
-
-    if (!preparedValue || typeof preparedValue !== "object" || Array.isArray(preparedValue)) {
-      return "{}";
-    }
-
-    const objectValue = preparedValue as Record<string, unknown>;
-    const fields = named.inputFields.map((field) => {
-      const fieldValue =
-        field.name in objectValue
-          ? objectValue[field.name]
-          : exampleValueForType(schema, field.type);
-      return `${field.name}: ${formatGraphqlValue(schema, field.type, fieldValue)}`;
-    });
-
-    return `{ ${fields.join(", ")} }`;
-  }
-
-  return formatArgValue(value);
+  return type.name;
 }
 
-function formatGraphqlValue(
-  schema: NormalizedSchema,
-  type: FieldDef["type"],
-  value: unknown
-): string {
-  if (type.kind === "NON_NULL") {
-    return formatGraphqlValue(schema, type.ofType, value);
-  }
-
-  if (value === null || value === undefined) {
-    return "null";
-  }
-
-  if (type.kind === "LIST") {
-    if (typeof value === "string") {
-      try {
-        const parsed = JSON.parse(value);
-        if (Array.isArray(parsed)) {
-          return `[${parsed.map((item) => formatGraphqlValue(schema, type.ofType, item)).join(", ")}]`;
-        }
-      } catch {
-        // Keep fallback behavior for non-JSON strings.
-      }
-    }
-
-    if (!Array.isArray(value)) {
-      return `[${formatGraphqlValue(schema, type.ofType, value)}]`;
-    }
-    return `[${value.map((item) => formatGraphqlValue(schema, type.ofType, item)).join(", ")}]`;
-  }
-
-  const named = schema.types[type.name];
-  if (!named) {
-    return formatArgValue(value);
-  }
-
-  if (named.kind === "ENUM") {
-    if (typeof value === "string" && named.values.includes(value)) {
-      return value;
-    }
-    return named.values[0] ?? "VALUE";
-  }
-
-  if (named.kind === "INPUT_OBJECT") {
-    let preparedValue = value;
-    if (typeof preparedValue === "string") {
-      try {
-        preparedValue = JSON.parse(preparedValue);
-      } catch {
-        // Keep fallback behavior for non-JSON strings.
-      }
-    }
-
-    if (!preparedValue || typeof preparedValue !== "object" || Array.isArray(preparedValue)) {
-      return "{}";
-    }
-
-    const objectValue = preparedValue as Record<string, unknown>;
-    const fields = named.inputFields.map((field) => {
-      const fieldValue =
-        field.name in objectValue
-          ? objectValue[field.name]
-          : exampleValueForType(schema, field.type);
-      return `${field.name}: ${formatGraphqlValue(schema, field.type, fieldValue)}`;
-    });
-
-    return `{ ${fields.join(", ")} }`;
-  }
-
-  return formatArgValue(value);
-}
-
-function buildArgs(schema: NormalizedSchema, field: FieldDef): string {
+function buildOperationArgs(field: FieldDef): {
+  variableDefinitions: string;
+  argumentList: string;
+} {
   if (!field.args.length) {
-    return "";
+    return { variableDefinitions: "", argumentList: "" };
   }
 
-  const pairs = field.args.map((arg) => {
-    const value = exampleValueForType(schema, arg.type);
-    return `${arg.name}: ${formatGraphqlValue(schema, arg.type, value)}`;
-  });
+  const variableDefinitions = field.args
+    .map((arg) => `$${arg.name}: ${toGraphqlType(arg.type)}`)
+    .join(", ");
 
-  return `(${pairs.join(", ")})`;
+  const argumentList = field.args.map((arg) => `${arg.name}: $${arg.name}`).join(", ");
+
+  return {
+    variableDefinitions: `(${variableDefinitions})`,
+    argumentList: `(${argumentList})`
+  };
+}
+
+function buildOperationVariables(
+  schema: NormalizedSchema,
+  field: FieldDef
+): Record<string, unknown> {
+  return Object.fromEntries(
+    field.args.map((arg) => [arg.name, exampleValueForType(schema, arg.type)])
+  );
 }
 
 function buildOperation(
@@ -192,19 +55,21 @@ function buildOperation(
   kind: "query" | "mutation" | "subscription",
   field: FieldDef
 ): GeneratedOperation {
-  const args = buildArgs(schema, field);
+  const args = buildOperationArgs(field);
+  const variables = buildOperationVariables(schema, field);
   const selection = buildSelectionSet(schema, field.type);
   const opName =
     `${kind}_${field.name.charAt(0).toUpperCase()}${field.name.slice(1)}`;
 
-  const graphql = `${kind} ${opName} {
-  ${field.name}${args} ${selection}
+  const graphql = `${kind} ${opName}${args.variableDefinitions} {
+  ${field.name}${args.argumentList} ${selection}
 }`;
 
   return {
     name: opName,
     kind,
-    graphql
+    graphql,
+    variables
   };
 }
 
