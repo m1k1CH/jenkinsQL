@@ -89,8 +89,6 @@ export default function GeneratedPage() {
 
       {parsed && parsed.ok ? (
         <>
-          <SchemaDiagram schemaSdl={parsed.sdl} />
-
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -131,7 +129,7 @@ export default function GeneratedPage() {
                     </div>
                   </div>
 
-                  <div className="mt-6 grid gap-4 xl:grid-cols-3">
+                  <div className="mt-6 grid gap-4 xl:grid-cols-4">
                     <div>
                       <h4 className="mb-2 text-sm font-medium text-zinc-400">GraphQL</h4>
                       <pre className="overflow-auto rounded-2xl bg-black p-4 text-sm">
@@ -150,11 +148,19 @@ export default function GeneratedPage() {
 {post}
                       </pre>
                     </div>
+                    <div>
+                      <h4 className="mb-2 text-sm font-medium text-zinc-400">Raw HTTP GET</h4>
+                      <pre className="overflow-auto rounded-2xl bg-black p-4 text-sm break-all">
+{get}
+                      </pre>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
+
+          <SchemaDiagram schemaSdl={parsed.sdl} />
         </>
       ) : (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 text-zinc-400">

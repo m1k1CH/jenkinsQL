@@ -140,11 +140,11 @@ export default function SchemaDiagram({ schemaSdl }: SchemaDiagramProps) {
         </div>
       ) : null}
 
-      <div className="mt-6 overflow-auto rounded-2xl bg-white p-4">
+      <div className="mt-6 max-h-[70vh] overflow-auto rounded-2xl bg-white p-4">
         {svg ? (
           <div
             dangerouslySetInnerHTML={{ __html: svg }}
-            className="[&>svg]:h-auto [&>svg]:min-w-[1100px] [&>svg]:max-w-none"
+            className="[&>svg]:h-auto [&>svg]:w-full [&>svg]:max-w-[1600px]"
           />
         ) : (
           <div className="text-sm text-zinc-500">
