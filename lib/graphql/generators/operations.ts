@@ -1,6 +1,6 @@
 import { exampleValueForType } from "@/lib/graphql/example-value";
 import { buildSelectionSet } from "@/lib/graphql/selection-set";
-import type { FieldDef, NormalizedSchema } from "@/lib/graphql/type-ref";
+import type { FieldDef, NormalizedSchema, TypeRef } from "@/lib/graphql/type-ref";
 
 export type GeneratedOperation = {
   name: string;
@@ -9,16 +9,91 @@ export type GeneratedOperation = {
   variables: Record<string, unknown>;
 };
 
-function toGraphqlType(type: FieldDef["type"]): string {
-  if (type.kind === "NON_NULL") {
-    return `${toGraphqlType(type.ofType)}!`;
+function parseJsonLike(value: unknown): unknown {
+  if (typeof value !== "string") {
+    return value;
   }
 
-  if (type.kind === "LIST") {
-    return `[${toGraphqlType(type.ofType)}]`;
+  const trimmed = value.trim();
+  if (
+    !(trimmed.startsWith("{") && trimmed.endsWith("}")) &&
+    !(trimmed.startsWith("[") && trimmed.endsWith("]"))
+  ) {
+    return value;
   }
 
-  return type.name;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return value;
+  }
+}
+
+function formatGraphqlLiteral(
+  schema: NormalizedSchema,
+  type: TypeRef | undefined,
+  rawValue: unknown
+): string {
+  const value = parseJsonLike(rawValue);
+
+  if (type?.kind === "NON_NULL") {
+    return formatGraphqlLiteral(schema, type.ofType, value);
+  }
+
+  if (value === null || value === undefined) {
+    return "null";
+  }
+
+  if (type?.kind === "LIST") {
+    if (!Array.isArray(value)) {
+      return `[${formatGraphqlLiteral(schema, type.ofType, value)}]`;
+    }
+    return `[${value.map((item) => formatGraphqlLiteral(schema, type.ofType, item)).join(", ")}]`;
+  }
+
+  if (type?.kind === "NAMED") {
+    const namedType = schema.types[type.name];
+    if (namedType?.kind === "ENUM") {
+      if (typeof value === "string" && namedType.values.includes(value)) {
+        return value;
+      }
+      return namedType.values[0] ?? "VALUE";
+    }
+
+    if (namedType?.kind === "INPUT_OBJECT") {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return "{}";
+      }
+
+      const objectValue = value as Record<string, unknown>;
+      const fields = namedType.inputFields.map((field) => {
+        const fieldValue =
+          field.name in objectValue
+            ? objectValue[field.name]
+            : exampleValueForType(schema, field.type);
+        return `${field.name}: ${formatGraphqlLiteral(schema, field.type, fieldValue)}`;
+      });
+
+      return `{${fields.length ? ` ${fields.join(", ")} ` : ""}}`;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => formatGraphqlLiteral(schema, undefined, item)).join(", ")}]`;
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).map(
+      ([key, nested]) => `${key}: ${formatGraphqlLiteral(schema, undefined, nested)}`
+    );
+    return `{${entries.length ? ` ${entries.join(", ")} ` : ""}}`;
+  }
+
+  if (typeof value === "string") {
+    return JSON.stringify(value);
+  }
+
+  return String(value);
 }
 
 function buildOperationArgs(field: FieldDef): {
@@ -29,17 +104,10 @@ function buildOperationArgs(field: FieldDef): {
     return { variableDefinitions: "", argumentList: "" };
   }
 
-  const variableDefinitions = field.args
-    .map((arg) => `$${arg.name}: ${toGraphqlType(arg.type)}`)
-    .join(", ");
-
-  const argumentList = field.args.map((arg) => `${arg.name}: $${arg.name}`).join(", ");
-
-  return {
-    variableDefinitions: `(${variableDefinitions})`,
-    argumentList: `(${argumentList})`
-  };
-}
+  const pairs = field.args.map((arg) => {
+    const value = exampleValueForType(schema, arg.type);
+    return `${arg.name}: ${formatGraphqlLiteral(schema, arg.type, value)}`;
+  });
 
 function buildOperationVariables(
   schema: NormalizedSchema,
