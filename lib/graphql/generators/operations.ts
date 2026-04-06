@@ -48,7 +48,10 @@ function formatGraphqlLiteral(
     if (!Array.isArray(value)) {
       return `[${formatGraphqlLiteral(schema, type.ofType, value)}]`;
     }
-    return `[${value.map((item) => formatGraphqlLiteral(schema, type.ofType, item)).join(", ")}]`;
+
+    return `[${value
+      .map((item) => formatGraphqlLiteral(schema, type.ofType, item))
+      .join(", ")}]`;
   }
 
   if (type?.kind === "NAMED") {
@@ -57,6 +60,7 @@ function formatGraphqlLiteral(
       if (typeof value === "string" && namedType.values.includes(value)) {
         return value;
       }
+
       return namedType.values[0] ?? "VALUE";
     }
 
@@ -79,13 +83,16 @@ function formatGraphqlLiteral(
   }
 
   if (Array.isArray(value)) {
-    return `[${value.map((item) => formatGraphqlLiteral(schema, undefined, item)).join(", ")}]`;
+    return `[${value
+      .map((item) => formatGraphqlLiteral(schema, undefined, item))
+      .join(", ")}]`;
   }
 
   if (typeof value === "object") {
     const entries = Object.entries(value as Record<string, unknown>).map(
       ([key, nested]) => `${key}: ${formatGraphqlLiteral(schema, undefined, nested)}`
     );
+
     return `{${entries.length ? ` ${entries.join(", ")} ` : ""}}`;
   }
 
@@ -98,13 +105,16 @@ function formatGraphqlLiteral(
 
 function normalizeGraphqlInputSyntax(value: string): string {
   return value
-    .replace(/\\"/g, "\"")
+    .replace(/\\"/g, '"')
     .replace(/"([_A-Za-z][_0-9A-Za-z]*)"\s*:/g, "$1: ")
     .replace(/:\s*/g, ": ")
     .replace(/,\s*/g, ", ");
 }
 
-function buildOperationArgs(field: FieldDef): {
+function buildOperationArgs(
+  schema: NormalizedSchema,
+  field: FieldDef
+): {
   variableDefinitions: string;
   argumentList: string;
 } {
@@ -118,6 +128,12 @@ function buildOperationArgs(field: FieldDef): {
     return `${arg.name}: ${normalizeGraphqlInputSyntax(literal)}`;
   });
 
+  return {
+    variableDefinitions: "",
+    argumentList: `(${pairs.join(", ")})`
+  };
+}
+
 function buildOperationVariables(
   schema: NormalizedSchema,
   field: FieldDef
@@ -127,20 +143,42 @@ function buildOperationVariables(
   );
 }
 
+function formatSelectionWithIndent(selection: string, indent = "  "): string {
+  const trimmed = selection.trim();
+  if (!trimmed.startsWith("{") || !trimmed.endsWith("}")) {
+    return trimmed;
+  }
+
+  const inner = trimmed.slice(1, -1).trim();
+  if (!inner) {
+    return "{}";
+  }
+
+  const fields = inner.split(/\s+/).filter(Boolean);
+  const body = fields.map((field) => `${indent}${field}`).join("\n");
+  return `{\n${body}\n}`;
+}
+
+function indentMultiline(value: string, indent = "  "): string {
+  return value
+    .split("\n")
+    .map((line) => `${indent}${line}`)
+    .join("\n");
+}
+
 function buildOperation(
   schema: NormalizedSchema,
   kind: "query" | "mutation" | "subscription",
   field: FieldDef
 ): GeneratedOperation {
-  const args = buildOperationArgs(field);
+  const args = buildOperationArgs(schema, field);
   const variables = buildOperationVariables(schema, field);
-  const selection = buildSelectionSet(schema, field.type);
-  const opName =
-    `${kind}_${field.name.charAt(0).toUpperCase()}${field.name.slice(1)}`;
+  const selection = formatSelectionWithIndent(buildSelectionSet(schema, field.type), "    ");
+  const opName = `${kind}_${field.name.charAt(0).toUpperCase()}${field.name.slice(1)}`;
 
-  const graphql = `${kind} ${opName}${args.variableDefinitions} {
-  ${field.name}${args.argumentList} ${selection}
-}`;
+  const graphql = `${kind} ${opName} {\n${indentMultiline(
+    `${field.name}${args.argumentList} ${selection}`
+  )}\n}`;
 
   return {
     name: opName,
