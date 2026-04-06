@@ -3,7 +3,7 @@ import { buildClientSchema, buildSchema, printSchema } from "graphql";
 import { enqueue } from "@/lib/diagram/queue";
 import { renderSvgFromSDL } from "@/lib/diagram/diagramRunner";
 
-export const runtime = "nodejs"; // Route Segment Config: runtime supports 'nodejs'/'edge'. citeturn2search0
+export const runtime = "nodejs";
 
 const DEFAULT_TIMEOUT_MS = 20000;
 const DEFAULT_MAX_BUFFER = 20 * 1024 * 1024;
@@ -17,34 +17,23 @@ export async function POST(request: Request) {
   const startedAt = Date.now();
 
   try {
-    const contentType = request.headers.get("content-type") || "";
+    const raw = await request.text();
+    if (tooLarge(Buffer.byteLength(raw, "utf8"))) {
+      return NextResponse.json({ errorCode: "INPUT_TOO_LARGE", message: "Payload too large" }, { status: 413 });
+    }
+    const json = JSON.parse(raw);
+    const normalizedInputKind = json.inputKind === "sdl" ? "sdl" : "introspection-json";
+    let inputKind: "introspection-json" | "sdl" = normalizedInputKind;
+    let payload = String(json.payload || "");
 
-    let inputKind: "introspection-json" | "sdl" | null = null;
-    let payload = "";
+    if (!payload && typeof json.schemaJson === "string") {
+      inputKind = "introspection-json";
+      payload = json.schemaJson;
+    }
 
-    if (contentType.includes("multipart/form-data")) {
-      const form = await request.formData();
-      const kind = String(form.get("inputKind") || "");
-      inputKind = kind === "sdl" ? "sdl" : "introspection-json";
-
-      const file = form.get("schemaFile");
-      if (file instanceof File) {
-        if (tooLarge(file.size)) {
-          return NextResponse.json({ errorCode: "INPUT_TOO_LARGE", message: `File too large: ${file.size} bytes` }, { status: 413 });
-        }
-        payload = await file.text();
-        inputKind = "sdl";
-      } else {
-        payload = String(form.get("payload") || "");
-      }
-    } else {
-      const raw = await request.text();
-      if (tooLarge(Buffer.byteLength(raw, "utf8"))) {
-        return NextResponse.json({ errorCode: "INPUT_TOO_LARGE", message: "Payload too large" }, { status: 413 });
-      }
-      const json = JSON.parse(raw);
-      inputKind = json.inputKind === "sdl" ? "sdl" : "introspection-json";
-      payload = String(json.payload || "");
+    if (!payload && typeof json.sdl === "string") {
+      inputKind = "sdl";
+      payload = json.sdl;
     }
 
     if (!inputKind || !payload.trim()) {
@@ -57,7 +46,6 @@ export async function POST(request: Request) {
       let sdl = "";
       if (inputKind === "introspection-json") {
         const intro = JSON.parse(payload);
-        // GraphQL.js: buildClientSchema produces schema from introspection result; printSchema prints SDL. citeturn0search1
         const schema = buildClientSchema(intro.data ?? intro);
         sdl = printSchema(schema);
       } else {
@@ -84,10 +72,17 @@ export async function POST(request: Request) {
     const result = await enqueue(job);
     return NextResponse.json(result, { status: 200 });
   } catch (e: any) {
-    const code = e?.code || "INTERNAL";
+    const code =
+      e?.code ||
+      (e instanceof SyntaxError ? "BAD_JSON" : "INTERNAL");
     const msg = e?.message || "Unknown error";
     const elapsedMs = Date.now() - startedAt;
-    const status = code === "QUEUE_FULL" ? 429 : 500;
+    const status =
+      code === "QUEUE_FULL" ? 429 :
+      code === "BAD_JSON" ? 400 :
+      code === "INPUT_TOO_LARGE" ? 413 :
+      code === "GRAPHQLVIZ_FAILED" || code === "DOT_FAILED" ? 422 :
+      500;
 
     return NextResponse.json(
       { errorCode: code, message: msg, elapsedMs },

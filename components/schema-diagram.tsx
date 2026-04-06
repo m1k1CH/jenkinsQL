@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import CopyButton from "@/components/copy-button";
 
 type SchemaDiagramProps = {
-  schemaJson: string;
+  schemaSdl: string;
 };
 
-export default function SchemaDiagram({ schemaJson }: SchemaDiagramProps) {
+export default function SchemaDiagram({ schemaSdl }: SchemaDiagramProps) {
   const [svg, setSvg] = useState("");
   const [sdl, setSdl] = useState("");
   const [error, setError] = useState("");
@@ -18,7 +18,7 @@ export default function SchemaDiagram({ schemaJson }: SchemaDiagramProps) {
     let cancelled = false;
 
     async function generate() {
-      if (!schemaJson.trim()) {
+      if (!schemaSdl.trim()) {
         setSvg("");
         setSdl("");
         setError("");
@@ -40,7 +40,10 @@ export default function SchemaDiagram({ schemaJson }: SchemaDiagramProps) {
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ schemaJson }),
+          body: JSON.stringify({
+            inputKind: "sdl",
+            payload: schemaSdl
+          }),
           signal: controller.signal
         });
 
@@ -49,7 +52,7 @@ export default function SchemaDiagram({ schemaJson }: SchemaDiagramProps) {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(data?.error || "Failed to generate diagram");
+          throw new Error(data?.message || "Failed to generate diagram");
         }
 
         if (cancelled) return;
@@ -79,7 +82,7 @@ export default function SchemaDiagram({ schemaJson }: SchemaDiagramProps) {
     return () => {
       cancelled = true;
     };
-  }, [schemaJson]);
+  }, [schemaSdl]);
 
   const svgBlobUrl = useMemo(() => {
     if (!svg) return "";
