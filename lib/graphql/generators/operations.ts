@@ -6,26 +6,48 @@ export type GeneratedOperation = {
   name: string;
   kind: "query" | "mutation" | "subscription";
   graphql: string;
+  variables: Record<string, unknown>;
 };
 
-function formatArgValue(value: unknown): string {
-  if (typeof value === "string") {
-    return JSON.stringify(value);
+function toGraphqlType(type: FieldDef["type"]): string {
+  if (type.kind === "NON_NULL") {
+    return `${toGraphqlType(type.ofType)}!`;
   }
-  return JSON.stringify(value, null, 0);
+
+  if (type.kind === "LIST") {
+    return `[${toGraphqlType(type.ofType)}]`;
+  }
+
+  return type.name;
 }
 
-function buildArgs(schema: NormalizedSchema, field: FieldDef): string {
+function buildOperationArgs(field: FieldDef): {
+  variableDefinitions: string;
+  argumentList: string;
+} {
   if (!field.args.length) {
-    return "";
+    return { variableDefinitions: "", argumentList: "" };
   }
 
-  const pairs = field.args.map((arg) => {
-    const value = exampleValueForType(schema, arg.type);
-    return `${arg.name}: ${formatArgValue(value)}`;
-  });
+  const variableDefinitions = field.args
+    .map((arg) => `$${arg.name}: ${toGraphqlType(arg.type)}`)
+    .join(", ");
 
-  return `(${pairs.join(", ")})`;
+  const argumentList = field.args.map((arg) => `${arg.name}: $${arg.name}`).join(", ");
+
+  return {
+    variableDefinitions: `(${variableDefinitions})`,
+    argumentList: `(${argumentList})`
+  };
+}
+
+function buildOperationVariables(
+  schema: NormalizedSchema,
+  field: FieldDef
+): Record<string, unknown> {
+  return Object.fromEntries(
+    field.args.map((arg) => [arg.name, exampleValueForType(schema, arg.type)])
+  );
 }
 
 function buildOperation(
@@ -33,19 +55,21 @@ function buildOperation(
   kind: "query" | "mutation" | "subscription",
   field: FieldDef
 ): GeneratedOperation {
-  const args = buildArgs(schema, field);
+  const args = buildOperationArgs(field);
+  const variables = buildOperationVariables(schema, field);
   const selection = buildSelectionSet(schema, field.type);
   const opName =
     `${kind}_${field.name.charAt(0).toUpperCase()}${field.name.slice(1)}`;
 
-  const graphql = `${kind} ${opName} {
-  ${field.name}${args} ${selection}
+  const graphql = `${kind} ${opName}${args.variableDefinitions} {
+  ${field.name}${args.argumentList} ${selection}
 }`;
 
   return {
     name: opName,
     kind,
-    graphql
+    graphql,
+    variables
   };
 }
 

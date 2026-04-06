@@ -1,8 +1,8 @@
-export function toJsonBody(graphql: string) {
+export function toJsonBody(graphql: string, variables: Record<string, unknown>) {
   return JSON.stringify(
     {
       query: graphql,
-      variables: {}
+      variables
     },
     null,
     2
@@ -12,11 +12,12 @@ export function toJsonBody(graphql: string) {
 export function toRawHttpRequest(
   host: string,
   path: string,
-  graphql: string
+  graphql: string,
+  variables: Record<string, unknown>
 ): string {
   const body = JSON.stringify({
     query: graphql,
-    variables: {}
+    variables
   });
 
   return `POST ${path} HTTP/1.1
@@ -31,9 +32,12 @@ ${body}`;
 export function toGetRequest(
   host: string,
   path: string,
-  graphql: string
+  graphql: string,
+  variables: Record<string, unknown>
 ): string {
-  const url = `${path}?query=${encodeURIComponent(graphql)}`;
+  const url = `${path}?query=${encodeURIComponent(graphql)}&variables=${encodeURIComponent(
+    JSON.stringify(variables)
+  )}`;
 
   return `GET ${url} HTTP/1.1
 Host: ${host}

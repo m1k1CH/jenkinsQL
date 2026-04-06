@@ -1,52 +1,83 @@
-import { promises as fs } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { execFile, spawn } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { spawn } from "node:child_process";
 
 export type RunnerLimits = {
-  timeoutMs: number;      // default 15–20s
-  maxBufferBytes: number; // default 20MB
+  timeoutMs: number;
+  maxBufferBytes: number;
 };
 
 export async function renderSvgFromSDL(schemaSDL: string, limits: RunnerLimits) {
   const startedAt = Date.now();
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "diagram-"));
-  const schemaPath = path.join(tempDir, "schema.graphql");
+  const dot = await sdlToDot(schemaSDL, limits);
+  const svg = await dotToSvg(dot, limits);
 
-  try {
-    await fs.writeFile(schemaPath, schemaSDL, "utf8");
+  return {
+    svg,
+    phaseMs: { total: Date.now() - startedAt }
+  };
+}
 
+function sdlToDot(schemaSDL: string, limits: RunnerLimits): Promise<string> {
+  return new Promise((resolve, reject) => {
     const graphqlvizBin = path.join(process.cwd(), "node_modules", ".bin", "graphqlviz");
+    const child = spawn(graphqlvizBin, [], { stdio: ["pipe", "pipe", "pipe"] });
 
-    // execFile runs without spawning a shell; supports timeout/maxBuffer. citeturn4search3turn4search15
-    const gv = await execFileAsync(graphqlvizBin, [schemaPath], {
-      timeout: limits.timeoutMs,
-      maxBuffer: limits.maxBufferBytes
+    const killTimer = setTimeout(() => {
+      child.kill("SIGTERM");
+    }, limits.timeoutMs);
+
+    let out = Buffer.alloc(0);
+    let err = Buffer.alloc(0);
+
+    child.stdout.on("data", (chunk: Buffer) => {
+      out = Buffer.concat([out, chunk]);
+      if (out.length > limits.maxBufferBytes) {
+        child.kill("SIGTERM");
+      }
     });
 
-    const dot = gv.stdout?.toString() ?? "";
-    if (!dot.trim()) {
-      const err: any = new Error(gv.stderr?.toString().slice(0, 2000) || "graphqlviz returned empty DOT");
-      err.code = "GRAPHQLVIZ_FAILED";
-      throw err;
-    }
+    child.stderr.on("data", (chunk: Buffer) => {
+      err = Buffer.concat([err, chunk]);
+      if (err.length > 2000) err = err.subarray(0, 2000);
+    });
 
-    const svg = await dotToSvg(dot, limits);
-    return {
-      svg,
-      phaseMs: { total: Date.now() - startedAt }
-    };
-  } finally {
-    await fs.rm(tempDir, { recursive: true, force: true });
-  }
+    child.on("error", (spawnErr: any) => {
+      const e: any = new Error(spawnErr?.message || "Failed to execute graphqlviz");
+      e.code = spawnErr?.code === "ENOENT" ? "GRAPHQLVIZ_NOT_INSTALLED" : "GRAPHQLVIZ_FAILED";
+      reject(e);
+    });
+
+    child.on("close", (code) => {
+      clearTimeout(killTimer);
+      if (code !== 0) {
+        const e: any = new Error(err.toString() || "graphqlviz failed");
+        e.code = "GRAPHQLVIZ_FAILED";
+        return reject(e);
+      }
+
+      const dot = out.toString("utf8");
+      if (!dot.trim()) {
+        const e: any = new Error("graphqlviz returned empty DOT");
+        e.code = "GRAPHQLVIZ_FAILED";
+        return reject(e);
+      }
+
+      resolve(dot);
+    });
+
+    child.stdin.end(schemaSDL, "utf8");
+  });
 }
 
 function dotToSvg(dot: string, limits: RunnerLimits): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn("dot", ["-Tsvg"], { stdio: ["pipe", "pipe", "pipe"] });
+
+    child.on("error", (spawnErr: any) => {
+      const e: any = new Error(spawnErr?.message || "Failed to execute dot");
+      e.code = spawnErr?.code === "ENOENT" ? "DOT_NOT_INSTALLED" : "DOT_FAILED";
+      reject(e);
+    });
 
     const killTimer = setTimeout(() => {
       child.kill("SIGTERM");

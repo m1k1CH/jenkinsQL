@@ -10,7 +10,7 @@ export const DEFAULT_STATE: GeneratorState = {
   introspectionResponse: ""
 };
 
-const STORAGE_KEY = "graphql-burp-generator-state";
+const STORAGE_KEY = "jenkinsgraphql-generator-state";
 
 export function loadState(): GeneratorState {
   if (typeof window === "undefined") {

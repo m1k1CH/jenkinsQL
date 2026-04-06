@@ -89,29 +89,21 @@ export default function GeneratedPage() {
 
       {parsed && parsed.ok ? (
         <>
-          <SchemaDiagram schemaJson={raw} />
-
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold">Schema SDL</h3>
-                <p className="text-sm text-zinc-400">
-                  Parsed schema used by backend diagram generation.
-                </p>
-              </div>
-              <CopyButton value={parsed.sdl} label="Copy SDL" />
-            </div>
-
-            <pre className="mt-4 max-h-[500px] overflow-auto rounded-2xl bg-black p-4 text-sm">
-{parsed.sdl}
-            </pre>
-          </div>
-
           <div className="space-y-6">
             {operations.map((operation) => {
-              const json = toJsonBody(operation.graphql);
-              const post = toRawHttpRequest(host, path, operation.graphql);
-              const get = toGetRequest(host, path, operation.graphql);
+              const json = toJsonBody(operation.graphql, operation.variables);
+              const post = toRawHttpRequest(
+                host,
+                path,
+                operation.graphql,
+                operation.variables
+              );
+              const get = toGetRequest(
+                host,
+                path,
+                operation.graphql,
+                operation.variables
+              );
 
               return (
                 <div
@@ -131,7 +123,7 @@ export default function GeneratedPage() {
                     </div>
                   </div>
 
-                  <div className="mt-6 grid gap-4 xl:grid-cols-3">
+                  <div className="mt-6 grid gap-4 xl:grid-cols-4">
                     <div>
                       <h4 className="mb-2 text-sm font-medium text-zinc-400">GraphQL</h4>
                       <pre className="overflow-auto rounded-2xl bg-black p-4 text-sm">
@@ -150,11 +142,19 @@ export default function GeneratedPage() {
 {post}
                       </pre>
                     </div>
+                    <div>
+                      <h4 className="mb-2 text-sm font-medium text-zinc-400">Raw HTTP GET</h4>
+                      <pre className="overflow-auto rounded-2xl bg-black p-4 text-sm break-all">
+{get}
+                      </pre>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
+
+          <SchemaDiagram schemaSdl={parsed.sdl} />
         </>
       ) : (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 text-zinc-400">
