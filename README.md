@@ -17,6 +17,8 @@ Web app that converts GraphQL introspection responses into friendly requests.
 `npm install &&
 npm run start`
 
+`npm run build` now auto-runs dependency install (`npm ci`) if `node_modules` is missing.
+
 ## Docker
 `docker compose up -d --build`
 
