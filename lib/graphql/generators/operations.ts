@@ -96,6 +96,14 @@ function formatGraphqlLiteral(
   return String(value);
 }
 
+function normalizeGraphqlInputSyntax(value: string): string {
+  return value
+    .replace(/\\"/g, "\"")
+    .replace(/"([_A-Za-z][_0-9A-Za-z]*)"\s*:/g, "$1: ")
+    .replace(/:\s*/g, ": ")
+    .replace(/,\s*/g, ", ");
+}
+
 function buildOperationArgs(field: FieldDef): {
   variableDefinitions: string;
   argumentList: string;
@@ -106,7 +114,8 @@ function buildOperationArgs(field: FieldDef): {
 
   const pairs = field.args.map((arg) => {
     const value = exampleValueForType(schema, arg.type);
-    return `${arg.name}: ${formatGraphqlLiteral(schema, arg.type, value)}`;
+    const literal = formatGraphqlLiteral(schema, arg.type, value);
+    return `${arg.name}: ${normalizeGraphqlInputSyntax(literal)}`;
   });
 
 function buildOperationVariables(
