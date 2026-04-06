@@ -91,9 +91,19 @@ export default function GeneratedPage() {
         <>
           <div className="space-y-6">
             {operations.map((operation) => {
-              const json = toJsonBody(operation.graphql);
-              const post = toRawHttpRequest(host, path, operation.graphql);
-              const get = toGetRequest(host, path, operation.graphql);
+              const json = toJsonBody(operation.graphql, operation.variables);
+              const post = toRawHttpRequest(
+                host,
+                path,
+                operation.graphql,
+                operation.variables
+              );
+              const get = toGetRequest(
+                host,
+                path,
+                operation.graphql,
+                operation.variables
+              );
 
               return (
                 <div

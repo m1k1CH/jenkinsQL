@@ -6,6 +6,7 @@ export type GeneratedOperation = {
   name: string;
   kind: "query" | "mutation" | "subscription";
   graphql: string;
+  variables: Record<string, unknown>;
 };
 
 function parseJsonLike(value: unknown): unknown {
@@ -95,9 +96,12 @@ function formatGraphqlLiteral(
   return String(value);
 }
 
-function buildArgs(schema: NormalizedSchema, field: FieldDef): string {
+function buildOperationArgs(field: FieldDef): {
+  variableDefinitions: string;
+  argumentList: string;
+} {
   if (!field.args.length) {
-    return "";
+    return { variableDefinitions: "", argumentList: "" };
   }
 
   const pairs = field.args.map((arg) => {
@@ -105,7 +109,13 @@ function buildArgs(schema: NormalizedSchema, field: FieldDef): string {
     return `${arg.name}: ${formatGraphqlLiteral(schema, arg.type, value)}`;
   });
 
-  return `(${pairs.join(", ")})`;
+function buildOperationVariables(
+  schema: NormalizedSchema,
+  field: FieldDef
+): Record<string, unknown> {
+  return Object.fromEntries(
+    field.args.map((arg) => [arg.name, exampleValueForType(schema, arg.type)])
+  );
 }
 
 function buildOperation(
@@ -113,19 +123,21 @@ function buildOperation(
   kind: "query" | "mutation" | "subscription",
   field: FieldDef
 ): GeneratedOperation {
-  const args = buildArgs(schema, field);
+  const args = buildOperationArgs(field);
+  const variables = buildOperationVariables(schema, field);
   const selection = buildSelectionSet(schema, field.type);
   const opName =
     `${kind}_${field.name.charAt(0).toUpperCase()}${field.name.slice(1)}`;
 
-  const graphql = `${kind} ${opName} {
-  ${field.name}${args} ${selection}
+  const graphql = `${kind} ${opName}${args.variableDefinitions} {
+  ${field.name}${args.argumentList} ${selection}
 }`;
 
   return {
     name: opName,
     kind,
-    graphql
+    graphql,
+    variables
   };
 }
 
