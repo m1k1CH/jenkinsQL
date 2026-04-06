@@ -29,6 +29,17 @@ function formatGraphqlValue(
   }
 
   if (type.kind === "LIST") {
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          return `[${parsed.map((item) => formatGraphqlValue(schema, type.ofType, item)).join(", ")}]`;
+        }
+      } catch {
+        // Keep fallback behavior for non-JSON strings.
+      }
+    }
+
     if (!Array.isArray(value)) {
       return `[${formatGraphqlValue(schema, type.ofType, value)}]`;
     }
@@ -48,11 +59,20 @@ function formatGraphqlValue(
   }
 
   if (named.kind === "INPUT_OBJECT") {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
+    let preparedValue = value;
+    if (typeof preparedValue === "string") {
+      try {
+        preparedValue = JSON.parse(preparedValue);
+      } catch {
+        // Keep fallback behavior for non-JSON strings.
+      }
+    }
+
+    if (!preparedValue || typeof preparedValue !== "object" || Array.isArray(preparedValue)) {
       return "{}";
     }
 
-    const objectValue = value as Record<string, unknown>;
+    const objectValue = preparedValue as Record<string, unknown>;
     const fields = named.inputFields.map((field) => {
       const fieldValue =
         field.name in objectValue
