@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "ensure-deps": "node scripts/ensure-deps.js",
     "dev": "next dev --hostname 0.0.0.0 --port 3000",
-    "build": "next build",
+    "build": "npm run ensure-deps && next build",
     "start": "next start --hostname 0.0.0.0 --port 3000",
     "lint": "next lint"
   },
