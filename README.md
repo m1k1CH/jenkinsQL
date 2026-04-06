@@ -14,11 +14,9 @@ Web app that converts GraphQL introspection responses into friendly requests.
 - Export raw HTTP GET request
 
 ## Run locally
-npm install &&
-npm run dev
-
-`npm run build` now auto-runs dependency install (`npm ci`) if `node_modules` is missing.
+`npm install &&
+npm run start`
 
 ## Docker
-sudo docker compose build && 
-sudo docker compose up
+`sudo docker compose build && 
+sudo docker compose up`
